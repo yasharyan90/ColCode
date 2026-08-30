@@ -1,0 +1,29 @@
+# SITE_ADDRESS=":80" serves plain HTTP (local / behind your own TLS terminator).
+# SITE_ADDRESS="editor.example.com" makes Caddy obtain and renew certificates automatically.
+{$SITE_ADDRESS::80} {
+	encode gzip zstd
+	root * /srv
+
+	# API server
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	# Sync server — /sync/<projectId> → ws://sync:1234/<projectId>  (prefix stripped)
+	handle_path /sync/* {
+		reverse_proxy sync:1234
+	}
+
+	# Single-page client
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

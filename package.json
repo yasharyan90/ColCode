@@ -1,0 +1,32 @@
+{
+  "name": "colcode",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Real-time collaborative code editor — Cursor meets Google Docs",
+  "workspaces": [
+    "client",
+    "server",
+    "sync-server",
+    "runner"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:client": "npm run dev -w client",
+    "dev:server": "npm run dev -w server",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:sync": "npm run dev -w sync-server",
+    "test:sync": "npm run test:sync -w sync-server",
+    "test:e2e": "node scripts/e2e-sync.mjs",
+    "test:e2e:presence": "node scripts/e2e-presence.mjs",
+    "dev:runner": "npm run dev -w runner",
+    "test:limits": "npm run test:limits -w runner",
+    "test:e2e:run": "node scripts/e2e-run.mjs",
+    "test:access": "npm run test:access -w server",
+    "test:e2e:project": "node scripts/e2e-project.mjs",
+    "test:load": "node scripts/load-sync.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.9.0"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "runner",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "ColCode execution worker — runs untrusted code in single-use, network-isolated, resource-capped Docker containers",
+  "scripts": {
+    "dev": "tsx watch --env-file=../.env --ignore '../node_modules/**' src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:limits": "tsx --env-file=../.env test/limits.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}

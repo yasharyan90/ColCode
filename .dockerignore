@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+.env
+.env.*
+!.env.example
+.idea
+.DS_Store
+*.log
+scripts/*.png
+sync-server-restarted.log

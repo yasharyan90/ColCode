@@ -1,0 +1,119 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * Tailwind v4 theme. Values mirror src/theme/tokens.ts (keep them in sync — tokens.ts is
+ * the source of truth; this block exists so utilities like bg-canvas / text-ink work).
+ */
+@theme {
+  --font-sans: 'Inter Variable', 'CursorGothic', system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  --color-canvas: #1c1b16;
+  --color-editor: #26251e;
+  --color-panel: #211f1a;
+  --color-raised: #2e2d25;
+  --color-strong: #3a3830;
+
+  --color-hairline: #33322b;
+  --color-hairline-soft: #2c2b24;
+  --color-hairline-strong: #48463d;
+
+  --color-ink: #f7f7f4;
+  --color-body: #c9c7bd;
+  --color-muted: #807d72;
+  --color-muted-soft: #5a5852;
+
+  --color-primary: #f54e00;
+  --color-primary-active: #d04200;
+  --color-on-primary: #ffffff;
+
+  --color-error: #e0506f;
+  --color-success: #3fb08a;
+  --color-warning: #e6c07b;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --text-caption-upper: 11px;
+  --text-caption-upper--line-height: 1.4;
+  --text-caption-upper--letter-spacing: 0.88px;
+  --text-caption-upper--font-weight: 600;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-body);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* Editorial display voice: weight 400, slight negative tracking. */
+.display { font-weight: 400; letter-spacing: -0.02em; }
+
+/* Section labels / pills: DESIGN.md caption-uppercase */
+.caption-upper {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.88px;
+  text-transform: uppercase;
+}
+
+/* Thin, warm scrollbars everywhere outside Monaco (Monaco styles its own). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #f7f7f424 transparent;
+}
+
+/* ---------- Remote cursors (y-monaco decorations; colors injected per peer) ---------- */
+.yRemoteSelection {
+  border-radius: 2px;
+}
+.yRemoteSelectionHead {
+  position: absolute;
+  height: 100%;
+  box-sizing: border-box;
+  border-left: 2px solid;
+  margin-left: -1px;
+}
+.yRemoteSelectionHead::after {
+  position: absolute;
+  left: -2px;
+  top: -1.35em;
+  padding: 1px 6px;
+  border-radius: 4px 4px 4px 0;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 10;
+}
+/* Show the name tag while the peer is active on that line, and on hover. */
+.yRemoteSelectionHead.tag-visible::after,
+.view-line:hover .yRemoteSelectionHead::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---------- xterm host ---------- */
+[data-terminal] .xterm { height: 100%; }
+[data-terminal] .xterm-viewport { background: transparent !important; }

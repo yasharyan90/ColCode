@@ -1,0 +1,29 @@
+{
+  "name": "sync-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "ColCode real-time sync server — y-websocket rooms scoped by project ID",
+  "scripts": {
+    "dev": "tsx watch --env-file=../.env --ignore '../node_modules/**' src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:sync": "tsx --env-file=../.env test/two-clients.ts"
+  },
+  "dependencies": {
+    "@y/websocket-server": "^0.1.1",
+    "pg": "^8.23.0",
+    "ws": "^8.21.3",
+    "yjs": "^13.6.32"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.1",
+    "jose": "^6.2.10",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "y-websocket": "^3.1.0"
+  }
+}
