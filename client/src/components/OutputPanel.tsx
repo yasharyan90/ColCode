@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { xtermTheme } from '../theme/xtermTheme'
 import { fonts } from '../theme/tokens'
+import { useResizable } from '../lib/useResizable'
 import type { RunController, RunEvent } from '../run/runController'
 
 interface Props {
@@ -16,13 +17,14 @@ interface Props {
 const DIM = '\x1b[2m', RESET = '\x1b[0m', RED = '\x1b[31m', GREEN = '\x1b[32m', YELLOW = '\x1b[33m', BOLD = '\x1b[1m'
 
 /**
- * Output panel: an xterm.js terminal that renders the run event stream.
- * It's display-only for now (no interactive stdin — milestone 6 may add it).
+ * Output panel: an xterm.js terminal that renders the run event stream, in a
+ * drag-resizable bottom panel. Display-only (no interactive stdin).
  */
 export function OutputPanel({ open, onToggle, controller }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
+  const { size: height, onPointerDown } = useResizable(224, { min: 96, max: 640, axis: 'y', invert: true })
 
   useEffect(() => {
     const host = hostRef.current
@@ -31,7 +33,7 @@ export function OutputPanel({ open, onToggle, controller }: Props) {
       theme: xtermTheme,
       fontFamily: fonts.code,
       fontSize: 12.5,
-      lineHeight: 1.4,
+      lineHeight: 1.45,
       cursorBlink: false,
       cursorStyle: 'underline',
       disableStdin: true,
@@ -43,7 +45,7 @@ export function OutputPanel({ open, onToggle, controller }: Props) {
     term.loadAddon(fit)
     term.open(host)
     fit.fit()
-    term.write(`${DIM}Press Run to execute the current file in an isolated sandbox.${RESET}\r\n`)
+    term.write(`${DIM}Press Run (⌘⏎) to execute the current file in an isolated sandbox.${RESET}\r\n`)
     termRef.current = term
     fitRef.current = fit
 
@@ -96,34 +98,45 @@ export function OutputPanel({ open, onToggle, controller }: Props) {
     }
   }, [controller])
 
-  // Re-fit when the panel opens.
-  useEffect(() => { if (open) requestAnimationFrame(() => { try { fitRef.current?.fit() } catch { /* ignore */ } }) }, [open])
+  // Re-fit when the panel opens or is resized.
+  useEffect(() => { if (open) requestAnimationFrame(() => { try { fitRef.current?.fit() } catch { /* ignore */ } }) }, [open, height])
 
   return (
     <section
-      className={['flex shrink-0 flex-col border-t border-hairline bg-panel', open ? 'h-56' : 'h-9'].join(' ')}
+      className="relative flex shrink-0 flex-col border-t border-hairline bg-panel"
+      style={{ height: open ? height : 36 }}
       data-output-panel
     >
-      <header className="flex h-9 shrink-0 items-center justify-between px-4">
-        <div className="flex items-center gap-4">
-          <span className="caption-upper text-ink">Output</span>
-          <span className="caption-upper text-muted-soft">Problems</span>
+      {open && (
+        <div
+          onPointerDown={onPointerDown}
+          className="group absolute inset-x-0 -top-[3px] z-10 h-[6px] cursor-row-resize"
+          aria-hidden
+        >
+          <div className="mx-auto mt-[2px] h-px w-full bg-transparent transition-colors group-hover:bg-primary/70 group-active:bg-primary" />
+        </div>
+      )}
+      <header className="flex h-9 shrink-0 items-center justify-between pl-4 pr-2">
+        <div className="flex h-full items-stretch gap-4">
+          <PanelTab active>Output</PanelTab>
+          <PanelTab>Problems</PanelTab>
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => termRef.current?.clear()}
-            className="caption-upper rounded-xs px-1.5 py-0.5 text-muted-soft transition-colors hover:bg-raised hover:text-body"
+            className="caption-upper rounded-xs px-1.5 py-0.5 text-[10px] text-muted-soft transition-colors hover:bg-raised hover:text-body"
           >
             Clear
           </button>
           <button
             type="button"
             onClick={onToggle}
-            className="grid h-5 w-5 place-items-center rounded-xs text-muted transition-colors hover:bg-raised hover:text-ink"
+            className="grid h-6 w-6 place-items-center rounded-xs text-muted transition-colors hover:bg-raised hover:text-ink"
             aria-label={open ? 'Collapse output' : 'Expand output'}
+            title={open ? 'Collapse panel' : 'Expand panel'}
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
               {open ? <path d="M2 3.5l3 3 3-3" /> : <path d="M2 6.5l3-3 3 3" />}
             </svg>
           </button>
@@ -131,5 +144,14 @@ export function OutputPanel({ open, onToggle, controller }: Props) {
       </header>
       <div ref={hostRef} className={['min-h-0 flex-1 px-3 pb-2', open ? '' : 'hidden'].join(' ')} data-terminal />
     </section>
+  )
+}
+
+function PanelTab({ children, active = false }: { children: React.ReactNode; active?: boolean }) {
+  return (
+    <span className={['caption-upper relative flex items-center text-[10.5px]', active ? 'text-ink' : 'text-muted-soft'].join(' ')}>
+      {children}
+      {active && <span className="absolute inset-x-0 bottom-0 h-px bg-ink/70" aria-hidden />}
+    </span>
   )
 }

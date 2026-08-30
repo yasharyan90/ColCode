@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import * as Y from 'yjs'
 import type { Peer } from '../collab/presence'
+import { FileIcon } from './FileIcon'
 
 interface Props {
   files: Y.Map<Y.Text> | undefined
@@ -8,6 +9,7 @@ interface Props {
   activeFile: string
   peers: Peer[]
   readOnly: boolean
+  projectName?: string
   onOpen: (name: string) => void
   onDeleted: (name: string) => void
   onRenamed: (from: string, to: string) => void
@@ -20,7 +22,7 @@ interface Node { name: string; path: string; children?: Node[]; isDir: boolean }
  * contains it — so "new folder" only lives locally until a file is put in it.
  * All mutations go through the shared Y.Map, so every collaborator sees them.
  */
-export function FileTree({ files, fileNames, activeFile, peers, readOnly, onOpen, onDeleted, onRenamed }: Props) {
+export function FileTree({ files, fileNames, activeFile, peers, readOnly, projectName, onOpen, onDeleted, onRenamed }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [pendingDirs, setPendingDirs] = useState<string[]>([])
   const [editing, setEditing] = useState<{ kind: 'new-file' | 'new-dir' | 'rename'; dir: string; path?: string } | null>(null)
@@ -81,20 +83,26 @@ export function FileTree({ files, fileNames, activeFile, peers, readOnly, onOpen
 
   return (
     <nav className="flex min-h-0 flex-1 flex-col" data-file-tree>
-      <div className="flex h-9 items-center justify-between px-4">
-        <span className="caption-upper text-muted">Explorer</span>
+      <div className="flex h-9 shrink-0 items-center justify-between pl-4 pr-2">
+        <span className="caption-upper text-[10.5px] text-muted">Explorer</span>
         {!readOnly && (
           <div className="flex items-center gap-0.5">
             <IconButton title="New file" data-new-file onClick={() => setEditing({ kind: 'new-file', dir: activeDir })}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M3 1.5h4l2.5 2.5v6.5h-6.5z M7 1.5v2.5h2.5 M6 6v3 M4.5 7.5h3" /></svg>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 1.5h4l2.5 2.5v6.5h-6.5z M7 1.5v2.5h2.5 M6 6v3 M4.5 7.5h3" /></svg>
             </IconButton>
             <IconButton title="New folder" data-new-folder onClick={() => setEditing({ kind: 'new-dir', dir: activeDir })}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M1.5 3h3l1 1h5v5.5h-9z M6 5.5v3 M4.5 7h3" /></svg>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 3h3l1 1h5v5.5h-9z M6 5.5v3 M4.5 7h3" /></svg>
             </IconButton>
           </div>
         )}
       </div>
-      <ul className="flex-1 overflow-y-auto pb-4">
+      {projectName && (
+        <div className="flex h-6 items-center gap-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-body">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3" className="rotate-90 text-muted" aria-hidden><path d="M3.5 2l3 3-3 3" /></svg>
+          <span className="truncate">{projectName}</span>
+        </div>
+      )}
+      <ul className="flex-1 overflow-y-auto pb-4 pt-0.5">
         {editing && editing.dir === '' && editing.kind !== 'rename' && (
           <li><InlineInput depth={0} placeholder={editing.kind === 'new-file' ? 'file-name.py' : 'folder-name'} onCommit={commit} onCancel={() => { setEditing(null); setError(null) }} /></li>
         )}
@@ -108,6 +116,11 @@ export function FileTree({ files, fileNames, activeFile, peers, readOnly, onOpen
             onDelete={remove} onCommit={commit} onCancel={() => { setEditing(null); setError(null) }}
           />
         ))}
+        {tree.length === 0 && !editing && (
+          <li className="px-4 py-3 text-[12px] leading-relaxed text-muted-soft">
+            {readOnly ? 'No files yet.' : 'No files yet — add one with the icons above.'}
+          </li>
+        )}
       </ul>
       {error && <p className="px-4 pb-2 text-[11.5px] text-error">{error}</p>}
     </nav>
@@ -137,17 +150,18 @@ function TreeNode(props: {
       data-kind={node.isDir ? 'dir' : 'file'}
       onClick={() => node.isDir ? props.onToggle(node.path) : props.onOpen(node.path)}
       className={[
-        'group flex w-full cursor-pointer items-center gap-1.5 py-1 pr-2 text-left text-[13px] transition-colors',
-        active ? 'bg-raised text-ink' : 'text-body hover:bg-raised/60 hover:text-ink',
+        'group relative flex h-[26px] w-full cursor-pointer select-none items-center gap-1.5 pr-2 text-left text-[13px] transition-colors',
+        active ? 'bg-raised text-ink' : 'text-body hover:bg-raised/50 hover:text-ink',
       ].join(' ')}
       style={{ paddingLeft: 12 + depth * 14 }}
     >
+      {active && <span className="absolute inset-y-0 left-0 w-0.5 bg-primary" aria-hidden />}
       {node.isDir ? (
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3" className={['shrink-0 text-muted transition-transform', isCollapsed ? '' : 'rotate-90'].join(' ')} aria-hidden><path d="M3.5 2l3 3-3 3" /></svg>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3" className={['shrink-0 text-muted transition-transform duration-150', isCollapsed ? '' : 'rotate-90'].join(' ')} aria-hidden><path d="M3.5 2l3 3-3 3" /></svg>
       ) : (
-        <FileGlyph name={node.name} />
+        <FileIcon name={node.name} size={13} className={active ? '' : 'opacity-80 group-hover:opacity-100'} />
       )}
-      <span className={['truncate', node.isDir ? '' : 'font-mono text-[12.5px]'].join(' ')}>{node.name}</span>
+      <span className={['truncate', node.isDir ? 'text-[12.5px] font-medium' : 'font-mono text-[12.5px]'].join(' ')}>{node.name}</span>
       {here.length > 0 && (
         <span className="ml-auto flex shrink-0 -space-x-0.5" title={here.map((p) => p.user.name).join(', ')}>
           {here.slice(0, 3).map((p) => <span key={p.clientId} className="inline-block h-2 w-2 rounded-full border border-canvas" style={{ background: p.user.color }} />)}
@@ -159,7 +173,9 @@ function TreeNode(props: {
           <IconButton title="Rename" data-rename onClick={() => props.onRename(node)}>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M6.5 1.5l2 2-5 5h-2v-2z" /></svg>
           </IconButton>
-          <IconButton title="Delete" data-delete onClick={() => props.onDelete(node)}>×</IconButton>
+          <IconButton title="Delete" data-delete onClick={() => props.onDelete(node)}>
+            <svg width="9" height="9" viewBox="0 0 9 9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l6 6M7.5 1.5l-6 6" /></svg>
+          </IconButton>
         </span>
       )}
     </div>
@@ -169,7 +185,8 @@ function TreeNode(props: {
     <li>
       {row}
       {node.isDir && !isCollapsed && (
-        <ul>
+        <ul className="relative">
+          <span className="pointer-events-none absolute bottom-0 top-0 w-px bg-hairline-soft" style={{ left: 16 + depth * 14 }} aria-hidden />
           {editing && editing.kind !== 'rename' && editing.dir === node.path && (
             <li><InlineInput depth={depth + 1} placeholder={editing.kind === 'new-file' ? 'file-name.py' : 'folder-name'} onCommit={props.onCommit} onCancel={props.onCancel} /></li>
           )}
@@ -192,7 +209,7 @@ function InlineInput({ depth, initial = '', placeholder, onCommit, onCancel }: {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') onCommit(value); if (e.key === 'Escape') onCancel() }}
         onBlur={() => (value.trim() && value !== initial ? onCommit(value) : onCancel())}
-        className="h-6 w-full rounded-sm border border-primary bg-editor px-1.5 font-mono text-[12.5px] text-ink outline-none"
+        className="h-6 w-full rounded-sm border border-primary bg-editor px-1.5 font-mono text-[12.5px] text-ink outline-none placeholder:text-muted-soft"
       />
     </div>
   )
@@ -203,16 +220,6 @@ function IconButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButton
     <button type="button" {...rest} className="grid h-5 w-5 place-items-center rounded-xs text-muted transition-colors hover:bg-strong hover:text-ink">
       {children}
     </button>
-  )
-}
-
-function FileGlyph({ name }: { name: string }) {
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : ''
-  const label = ext ? (ext.length <= 3 ? ext.toUpperCase() : ext.slice(0, 2).toUpperCase()) : '·'
-  return (
-    <span className="grid h-4 w-6 shrink-0 place-items-center rounded-xs border border-hairline-strong text-[9px] font-semibold tracking-wide text-muted">
-      {label}
-    </span>
   )
 }
 

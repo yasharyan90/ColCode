@@ -1,0 +1,19 @@
+# Vercel hosts only the client; everything else runs on the Docker host.
+server
+sync-server
+runner
+deploy
+scripts
+docker-compose*.yml
+Dockerfile
+.dockerignore
+DESIGN.md
+making.md
+*.log
+.idea
+.DS_Store
+**/node_modules
+**/dist
+.env
+.env.*
+!.env.example

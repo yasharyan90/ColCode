@@ -162,6 +162,46 @@ Notes:
 - Scaling: `api` and `runner` are stateless (Redis shares rate limits); `sync` scales by running
   more instances with sticky routing per project (rooms are independent).
 
+### Client on Vercel
+
+Vercel can host the static client only: the sync server is a long-lived WebSocket process and the
+runner needs a Docker daemon, neither of which fits serverless. The split deployment is:
+
+```
+browser ──► Vercel (static client)
+   │            └─ /api/*  ──rewrite──► https://api.your-domain.com/api/*   (Caddy → api)
+   └──────── wss://api.your-domain.com/sync/<projectId>   (Caddy → sync, direct — no proxy)
+```
+
+`vercel.json` at the repo root does the client build (`npm ci -w client`, `npm run build -w client`,
+output `client/dist`), the SPA fallback, cache/security headers, and the `/api/*` rewrite. Because
+Vercel proxies `/api` server-side, the session cookie stays first-party — no CORS, no
+`SameSite=None`. Vercel does not proxy WebSocket upgrades, so the sync socket goes straight to the
+backend host via `VITE_SYNC_URL`.
+
+1. Run the backend stack on any Docker host as above, with `SITE_ADDRESS=api.your-domain.com`
+   (Caddy gets the certificate) and **`APP_URL` set to the Vercel URL** — that is where the
+   browser lives, so it drives the OAuth callback and `Secure` cookies. The GitHub OAuth app's
+   callback becomes `https://<vercel-domain>/api/auth/github/callback`.
+2. In `vercel.json`, replace `api.colcode.example.com` with your backend host. (You can also change
+   the rewrite later without a redeploy under Project → CDN → Routing.)
+3. Import the repo in Vercel with the **Root Directory left at the repo root** (the lockfile and
+   workspaces live there — `vercel.json` scopes the install/build to `client`), and add one
+   environment variable: `VITE_SYNC_URL=wss://api.your-domain.com/sync`.
+4. Deploy: push to the connected branch, or `npx vercel --prod`.
+
+Checks: `https://<vercel-domain>/api/health` returns `{"ok":true,...}` through the rewrite;
+sign-in redirects back to the Vercel domain; a project page shows "connected" (the WebSocket in
+devtools points at `wss://api.your-domain.com/sync/<id>?token=…`).
+
+Notes:
+- Preview deployments share the backend; set `VITE_SYNC_URL` for the Preview environment too, and
+  point a second GitHub OAuth app + `APP_URL` at a preview alias if you want sign-in on previews.
+- The Docker host's Caddy still serves the client as well, so `https://api.your-domain.com` keeps
+  working as a fallback origin (its `/api` cookie is a separate session from the Vercel one).
+- `/api/run` streams NDJSON through Vercel's proxy; the stream is passed through, but a run is
+  capped by the upstream proxy timeout as well as the runner's own per-language limit.
+
 ## Tests
 
 ```bash

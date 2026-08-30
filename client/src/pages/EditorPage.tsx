@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type * as Monaco from 'monaco-editor'
 import { api, type Member, type ProjectDetail } from '../api'
 import type { AuthState } from '../auth/useAuth'
 import { TopBar } from '../components/TopBar'
 import { FileTree } from '../components/FileTree'
 import { EditorTabs } from '../components/EditorTabs'
+import { Breadcrumbs } from '../components/Breadcrumbs'
 import { EditorPane, type CursorInfo } from '../components/EditorPane'
 import { OutputPanel } from '../components/OutputPanel'
 import { StatusBar } from '../components/StatusBar'
 import { PresenceStyles } from '../components/PresenceStyles'
+import { LogoMark } from '../components/Wordmark'
 import { languageForFile } from '../lib/monaco'
+import { useResizable } from '../lib/useResizable'
+import { downloadProjectZip } from '../lib/downloadZip'
 import { useProject } from '../collab/useProject'
 import { RunController, RUNNABLE_LANGUAGES, refreshRunnableLanguages, type RunStatus } from '../run/runController'
 import type { Peer } from '../collab/presence'
@@ -42,7 +47,7 @@ export function EditorPage({ projectId, auth }: { projectId: string; auth: AuthS
   }, [token, projectId])
 
   if (loadError) return <ErrorState message={loadError} />
-  if (!project || !token) return <div className="flex h-full items-center justify-center bg-canvas"><p className="display text-2xl text-muted">Opening project…</p></div>
+  if (!project || !token) return <Loading label="Opening project" />
   return <Workspace project={project} token={token} auth={auth} onMembers={(members) => setProject({ ...project, members })} />
 }
 
@@ -56,6 +61,8 @@ function Workspace({ project, token, auth, onMembers }: { project: ProjectDetail
   const [activeFile, setActiveFile] = useState<string>('')
   const [cursor, setCursor] = useState<CursorInfo>({ line: 1, column: 1 })
   const [outputOpen, setOutputOpen] = useState(true)
+  const [editor, setEditor] = useState<Monaco.editor.IStandaloneCodeEditor | null>(null)
+  const sidebar = useResizable(240, { min: 180, max: 480, axis: 'x' })
 
   const controller = useMemo(() => new RunController(), [])
   const [runStatus, setRunStatus] = useState<RunStatus>('idle')
@@ -74,8 +81,12 @@ function Workspace({ project, token, auth, onMembers }: { project: ProjectDetail
 
   useEffect(() => { publishActiveFile(activeFile || null) }, [activeFile, publishActiveFile])
 
+  // Open the entry file once on first sync; closing every tab afterwards shows the welcome pane.
+  const autoOpened = useRef(false)
   useEffect(() => {
-    if (synced && openFiles.length === 0 && fileNames.length > 0) {
+    if (autoOpened.current || !synced || fileNames.length === 0) return
+    autoOpened.current = true
+    if (openFiles.length === 0) {
       const first = fileNames.includes('main.ts') ? 'main.ts' : fileNames[0]
       setOpenFiles([first]); setActiveFile(first)
     }
@@ -116,8 +127,19 @@ function Workspace({ project, token, auth, onMembers }: { project: ProjectDetail
     void controller.start(activeFile, activeLanguage, activeText.toString())
   }, [activeText, canRun, controller, activeFile, activeLanguage])
 
+  const download = useCallback(() => { if (files) downloadProjectZip(project.name, files) }, [files, project.name])
+
+  const triggerEditor = useCallback((action: string) => {
+    if (!editor) return
+    editor.focus()
+    editor.trigger('colcode', action, null)
+  }, [editor])
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); runActive() } }
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); runActive() }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'j') { e.preventDefault(); setOutputOpen((o) => !o) }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [runActive])
@@ -133,18 +155,25 @@ function Workspace({ project, token, auth, onMembers }: { project: ProjectDetail
         onRename={setName}
         onMembers={onMembers}
         onFollow={follow}
+        onCommand={() => triggerEditor('editor.action.quickCommand')}
+        onDownload={download}
+        fileCount={fileNames.length}
         run={{ status: runStatus, canRun, language: activeLanguage, onRun: runActive, onStop: () => controller.stop() }}
         auth={auth}
       />
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-60 shrink-0 flex-col border-r border-hairline bg-canvas">
-          <FileTree files={files} fileNames={fileNames} activeFile={activeFile} peers={peers} readOnly={readOnly}
+        <aside className="relative flex shrink-0 flex-col border-r border-hairline bg-canvas" style={{ width: sidebar.size }}>
+          <FileTree files={files} fileNames={fileNames} activeFile={activeFile} peers={peers} readOnly={readOnly} projectName={project.name}
             onOpen={openFile} onDeleted={closeFile} onRenamed={onRenamed} />
+          <div onPointerDown={sidebar.onPointerDown} className="group absolute -right-[3px] inset-y-0 z-10 w-[6px] cursor-col-resize" aria-hidden>
+            <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-primary/70 group-active:bg-primary" />
+          </div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col">
           <EditorTabs files={openFiles} activeFile={activeFile} onSelect={setActiveFile} onClose={closeFile} />
+          {activeFile && <Breadcrumbs projectName={project.name} path={activeFile} />}
           <div className="min-h-0 flex-1 bg-editor">
             {activeText ? (
               <EditorPane
@@ -156,30 +185,71 @@ function Workspace({ project, token, auth, onMembers }: { project: ProjectDetail
                 readOnly={readOnly}
                 reveal={reveal}
                 onCursorChange={setCursor}
+                onReady={setEditor}
               />
             ) : (
-              <EmptyState synced={synced} status={status} />
+              <Welcome synced={synced} status={status} hasFiles={fileNames.length > 0} readOnly={readOnly} />
             )}
           </div>
           <OutputPanel open={outputOpen} onToggle={() => setOutputOpen((o) => !o)} controller={controller} />
         </main>
       </div>
 
-      <StatusBar cursor={cursor} language={activeLanguage} fileName={activeFile} status={status} synced={synced} peerCount={peers.length} />
+      <StatusBar cursor={cursor} language={activeLanguage} fileName={activeFile} status={status} synced={synced} peerCount={peers.length}
+        onGoToLine={() => triggerEditor('editor.action.gotoLine')} />
     </div>
   )
 }
 
-function EmptyState({ synced, status }: { synced: boolean; status: string }) {
-  const msg = !synced ? (status === 'connected' ? 'Syncing project…' : 'Connecting to sync server…') : 'Open a file to start editing'
-  return <div className="flex h-full items-center justify-center"><p className="display text-2xl text-muted">{msg}</p></div>
+const SHORTCUTS: [string, string][] = [
+  ['Run current file', '⌘ ⏎'],
+  ['Command palette', 'F1'],
+  ['Find / Replace', '⌘ F · ⌘ H'],
+  ['Go to line', '⌃ G'],
+  ['Toggle output', '⌘ J'],
+  ['Multi-cursor', '⌥ Click'],
+]
+
+/** Cursor-style welcome pane: shown while syncing, or when no tab is open. */
+function Welcome({ synced, status, hasFiles, readOnly }: { synced: boolean; status: string; hasFiles: boolean; readOnly: boolean }) {
+  if (!synced) return <Loading label={status === 'connected' ? 'Syncing project' : 'Connecting to sync server'} />
+  return (
+    <div className="fade-up flex h-full flex-col items-center justify-center gap-8 px-6">
+      <div className="flex flex-col items-center gap-3">
+        <LogoMark size={40} />
+        <p className="display text-[22px] text-ink">{hasFiles ? 'Pick a file to start editing' : readOnly ? 'This project has no files yet' : 'Create your first file'}</p>
+        <p className="max-w-sm text-center text-[13px] text-muted">
+          {hasFiles ? 'Open one from the explorer — everyone in the room sees your cursor and edits instantly.' : readOnly ? 'You have view-only access. Ask the owner to add files or grant editing.' : 'Use the new-file icon in the explorer. Files are shared with every collaborator the moment they exist.'}
+        </p>
+      </div>
+      <dl className="grid grid-cols-[auto_auto] gap-x-8 gap-y-2 text-[12.5px]">
+        {SHORTCUTS.map(([label, keys]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted">{label}</dt>
+            <dd className="text-right font-mono text-[11.5px] text-body">{keys}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+function Loading({ label }: { label: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 bg-canvas">
+      <div className="spinner" aria-hidden />
+      <p className="text-[13px] text-muted">{label}…</p>
+    </div>
+  )
 }
 
 function ErrorState({ message }: { message: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 bg-canvas">
-      <p className="display text-2xl text-muted">{message}</p>
-      <button type="button" onClick={() => navigate('/')} className="rounded-md border border-hairline-strong px-3 py-1.5 text-[13px] text-body hover:bg-raised">Back to projects</button>
+      <LogoMark size={28} />
+      <p className="display text-2xl text-ink">Couldn't open this project</p>
+      <p className="text-[13px] text-muted">{message}</p>
+      <button type="button" onClick={() => navigate('/')} className="mt-2 rounded-md border border-hairline-strong px-3 py-1.5 text-[13px] text-body transition-colors hover:bg-raised hover:text-ink">Back to projects</button>
     </div>
   )
 }

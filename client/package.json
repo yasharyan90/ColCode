@@ -16,6 +16,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "fflate": "^0.8.3",
     "monaco-editor": "^0.56.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -36,10 +37,10 @@
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-arm64-musl": "1.2.6",
-    "@tailwindcss/oxide-linux-arm64-musl": "4.3.3",
-    "lightningcss-linux-arm64-musl": "1.33.0",
     "@rolldown/binding-linux-x64-musl": "1.2.6",
+    "@tailwindcss/oxide-linux-arm64-musl": "4.3.3",
     "@tailwindcss/oxide-linux-x64-musl": "4.3.3",
+    "lightningcss-linux-arm64-musl": "1.33.0",
     "lightningcss-linux-x64-musl": "1.33.0"
   }
 }

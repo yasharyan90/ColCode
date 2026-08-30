@@ -21,6 +21,8 @@ interface Props {
   /** Bump `nonce` to scroll `line` into view (used by click-to-follow). */
   reveal?: { line: number; nonce: number } | null
   onCursorChange: (cursor: CursorInfo) => void
+  /** Hands the live editor to the page so chrome (command center, status bar) can trigger actions. */
+  onReady?: (editor: Monaco.editor.IStandaloneCodeEditor | null) => void
 }
 
 /**
@@ -31,7 +33,7 @@ interface Props {
  * Awareness carries remote cursors: y-monaco writes our selection into the
  * awareness state and renders every peer's as decorations (see PresenceStyles).
  */
-export function EditorPane({ path, language, ytext, awareness, readOnly = false, reveal, onCursorChange }: Props) {
+export function EditorPane({ path, language, ytext, awareness, readOnly = false, reveal, onCursorChange, onReady }: Props) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null)
   const bindingRef = useRef<MonacoBinding | null>(null)
   const pendingReveal = useRef<{ line: number; nonce: number } | null>(null)
@@ -56,6 +58,7 @@ export function EditorPane({ path, language, ytext, awareness, readOnly = false,
     editor.onDidChangeCursorPosition((e) => {
       onCursorChange({ line: e.position.lineNumber, column: e.position.column })
     })
+    onReady?.(editor)
     editor.focus()
   }
 
@@ -68,6 +71,7 @@ export function EditorPane({ path, language, ytext, awareness, readOnly = false,
 
   useEffect(() => {
     return () => {
+      onReady?.(null)
       bindingRef.current?.destroy()
       bindingRef.current = null
       // y-monaco leaves our last selection in awareness when it unbinds; clear it
@@ -113,34 +117,48 @@ function flashTagsOnRemoteActivity(editor: Monaco.editor.IStandaloneCodeEditor, 
   editor.onDidDispose(() => awareness.off('change', onChange))
 }
 
+/**
+ * Editor options tuned to feel like Cursor: comfortable 13/21 metrics, generous top
+ * padding, quiet gutter, smooth caret, bracket guides only on the active pair, and a
+ * minimap whose slider stays out of the way until hovered.
+ */
 const EDITOR_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
   fontFamily: fonts.code,
   fontSize: 13,
-  lineHeight: 20,
+  lineHeight: 21,
   fontLigatures: true,
   letterSpacing: 0,
   tabSize: 2,
   insertSpaces: true,
-  minimap: { enabled: true, renderCharacters: false, scale: 1 },
+  minimap: { enabled: true, renderCharacters: false, scale: 1, showSlider: 'mouseover', maxColumn: 100 },
   scrollBeyondLastLine: false,
   smoothScrolling: true,
   cursorBlinking: 'smooth',
   cursorSmoothCaretAnimation: 'on',
+  cursorSurroundingLines: 4,
   cursorWidth: 2,
-  renderLineHighlight: 'line',
-  lineNumbersMinChars: 4,
+  renderLineHighlight: 'all',
+  renderLineHighlightOnlyWhenFocus: true,
+  lineNumbersMinChars: 3,
+  lineDecorationsWidth: 12,
   glyphMargin: false,
   folding: true,
+  foldingHighlight: false,
+  showFoldingControls: 'mouseover',
   bracketPairColorization: { enabled: false },
-  guides: { indentation: true, bracketPairs: false },
-  padding: { top: 12, bottom: 12 },
-  scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10, useShadows: false },
+  matchBrackets: 'always',
+  guides: { indentation: true, bracketPairs: 'active', highlightActiveIndentation: true },
+  padding: { top: 18, bottom: 18 },
+  scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8, useShadows: false },
   overviewRulerBorder: false,
   hideCursorInOverviewRuler: true,
   renderWhitespace: 'none',
+  roundedSelection: true,
   wordWrap: 'off',
   automaticLayout: true,
   quickSuggestions: true,
   suggestOnTriggerCharacters: true,
-  stickyScroll: { enabled: false },
+  suggest: { showIcons: true, preview: true },
+  linkedEditing: true,
+  stickyScroll: { enabled: true, maxLineCount: 3 },
 }
